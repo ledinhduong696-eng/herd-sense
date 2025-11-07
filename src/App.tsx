@@ -14,7 +14,11 @@ type Page = 'home' | 'survey' | 'situation' | 'result' | 'about' | 'contact' | '
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [surveyId, setSurveyId] = useState<string>('');
-
+  const [heartRates, setHeartRates] = useState<number[]>([]);
+  const resetHeartRate = () => {
+    setHeartRates([]);
+  };
+  
   const handleStartSurvey = () => {
     setCurrentPage('survey');
   };
@@ -46,10 +50,24 @@ function App() {
         <Header currentPage={currentPage} onNavigate={handleNavigate} />
       )}
 
-      {currentPage === 'home' && <Home onStartSurvey={handleStartSurvey} />}
-      {currentPage === 'survey' && (
-        <Survey onComplete={handleSurveyComplete} onBack={handleBackFromSurvey} />
+      {currentPage === 'home' && (
+        <Home 
+          onStartSurvey={() => {
+            resetHeartRate();     // ✅ reset trước
+            handleStartSurvey();  // ✅ sau đó chuyển sang survey
+          }} 
+        />
       )}
+
+      {currentPage === 'survey' && (
+        <Survey 
+          onComplete={handleSurveyComplete} 
+          onBack={handleBackFromSurvey}
+          heartRates={heartRates}              // ✅ truyền dữ liệu
+          setHeartRates={setHeartRates}        // ✅ truyền hàm ghi dữ liệu mới
+        />
+      )}
+
       {currentPage === 'situation' && (
         <SituationAI
           surveyId={surveyId}
