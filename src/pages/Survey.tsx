@@ -10,6 +10,8 @@ import HeartRateChart from "../components/HeartRateChart";
 interface SurveyProps {
   onComplete: (surveyId: string) => void;
   onBack: () => void;
+  heartRates: number[];
+  setHeartRates: React.Dispatch<React.SetStateAction<number[]>>;
 }
 
 export default function Survey({ onComplete, onBack }: SurveyProps) {
@@ -494,7 +496,7 @@ export default function Survey({ onComplete, onBack }: SurveyProps) {
         
         {/* 💓 Đồ thị nhịp tim */}
         <div className="absolute top-4 left-4 z-10">
-              <HeartRateChart />
+              <HeartRateChart data={heartRates} />
         </div>
 
         {/* 👇 Camera chỉ hiển thị khi làm bài */}
