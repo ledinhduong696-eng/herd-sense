@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { surveyQuestions } from '../data/questions';
 import { supabase } from '../lib/supabase';
 import { Survey as SurveyType } from '../types';
+import FaceAnalyzer from "../components/FaceAnalyzer";
+import * as faceapi from 'face-api.js';
+import HeartRateChart from "../components/HeartRateChart";
 
 interface SurveyProps {
   onComplete: (surveyId: string) => void;
@@ -10,7 +13,9 @@ interface SurveyProps {
 }
 
 export default function Survey({ onComplete, onBack }: SurveyProps) {
+  const workerRef = useRef<Worker | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
+  const [situationMode, setSituationMode] = useState(false);
   const [userInfo, setUserInfo] = useState({
     name: '',
     age: '',
@@ -18,6 +23,110 @@ export default function Survey({ onComplete, onBack }: SurveyProps) {
     school: '',
   });
   const [answers, setAnswers] = useState<Record<string, any>>({});
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [expressions, setExpressions] = useState<faceapi.FaceExpressions | null>(null);
+
+  const handleBackToHome = () => {
+    // Dừng camera
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach((t) => t.stop());
+      videoRef.current.srcObject = null;
+    }
+  
+    // Dừng worker (nếu có)
+    if (workerRef.current) {
+      workerRef.current.terminate();
+      workerRef.current = null;
+    }
+    
+    setSituationMode(false);
+
+    // Quay lại
+    setTimeout(() => onBack(), 300);
+  };
+  
+  const stopSurveyCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach((t) => t.stop());
+      videoRef.current.srcObject = null;
+    }
+  
+    if (workerRef.current) {
+      workerRef.current.terminate();
+      workerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    let intervalId: number | null = null;
+    let localWorker: Worker | null = null;
+    let localStream: MediaStream | null = null;
+  
+    const init = async () => {
+      try {
+        localWorker = new Worker(new URL("../workers/faceWorker.js", import.meta.url));
+        workerRef.current = localWorker;
+        localWorker.postMessage({ type: "INIT" });
+  
+        localWorker.onmessage = (event) => {
+          const { type, expressions } = event.data;
+          if (type === "RESULT") {
+            setExpressions(expressions);
+          }
+        };
+  
+        // 🎥 Khởi động camera
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, frameRate: { max: 5 } },
+        });
+  
+        if (videoRef.current) {
+          videoRef.current.srcObject = localStream;
+        }
+  
+        // Gửi frame đến worker mỗi 1.5s
+        intervalId = window.setInterval(async () => {
+          // Ngăn không chạy khi video đã dừng hoặc stream bị mất
+          if (
+            !videoRef.current ||
+            !workerRef.current ||
+            !videoRef.current.srcObject ||
+            (videoRef.current.readyState !== 4 && videoRef.current.readyState !== 2)
+          ) {
+            return;
+          }
+        
+          try {
+            const bitmap = await createImageBitmap(videoRef.current);
+            workerRef.current.postMessage({ type: "DETECT", imageBitmap: bitmap }, [bitmap]);
+          } catch (err) {
+            console.warn("Frame send error:", err);
+          }
+        }, 1500);
+      } catch (err) {
+        console.error("Init camera error:", err);
+        stopSurveyCamera();
+      }
+    };
+  
+    if ((currentStep > 0 && currentStep <= surveyQuestions.length) || situationMode) {
+      init();
+    }
+  
+    // 🧹 Cleanup: dừng camera và worker khi đổi step hoặc rời trang
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (localWorker) localWorker.terminate();
+  
+      if (localStream) {
+        localStream.getTracks().forEach((t) => t.stop());
+        console.log("✅ Camera stopped");
+      }
+    };
+  }, [currentStep, situationMode]);     
 
   const handleUserInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +201,7 @@ export default function Survey({ onComplete, onBack }: SurveyProps) {
 
       if (resultError) throw resultError;
 
+      stopSurveyCamera();
       onComplete(survey.id);
     } catch (error) {
       console.error('Error submitting survey:', error);
@@ -151,7 +261,7 @@ export default function Survey({ onComplete, onBack }: SurveyProps) {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 py-12 px-4">
         <div className="max-w-2xl mx-auto">
           <button
-            onClick={onBack}
+            onClick={handleBackToHome}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -246,7 +356,10 @@ export default function Survey({ onComplete, onBack }: SurveyProps) {
                 Xem lại
               </button>
               <button
-                onClick={() => submitSurvey('result')}
+                onClick={() => {
+                  setSituationMode(true);
+                  submitSurvey('situation');
+                }}
                 className="px-6 py-3 bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition-all"
               >
                 Tình huống
@@ -377,6 +490,32 @@ export default function Survey({ onComplete, onBack }: SurveyProps) {
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
+        </div> 
+        
+        {/* 💓 Đồ thị nhịp tim */}
+        <div className="absolute top-4 left-4 z-10">
+              <HeartRateChart />
+        </div>
+
+        {/* 👇 Camera chỉ hiển thị khi làm bài */}
+        <div className="absolute top-6 right-6 flex flex-col items-center bg-white/70 rounded-xl shadow-md p-3">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            width="240"
+            height="180"
+            className="rounded-lg"
+          />
+          {expressions && (
+            <div className="mt-2 text-xs text-center">
+              {Object.entries(expressions).map(([key, value]) => (
+                <p key={key}>
+                 {key}: {((value as number) * 100).toFixed(1)}%
+               </p>
+             ))}
+            </div>
+          )} 
         </div>
       </div>
     </div>

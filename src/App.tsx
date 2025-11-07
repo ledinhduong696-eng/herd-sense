@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Chatbot from './components/Chatbot';
 import Home from './pages/Home';
@@ -12,7 +12,7 @@ import SituationAI from "./components/SituationAI";
 type Page = 'home' | 'survey' | 'situation' | 'result' | 'about' | 'contact' | 'reviews';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'survey' | 'situation' | 'result'>('home');
+  const [currentPage, setCurrentPage] = useState<Page>('home');
   const [surveyId, setSurveyId] = useState<string>('');
 
   const handleStartSurvey = () => {
