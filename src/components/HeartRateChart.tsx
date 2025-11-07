@@ -39,7 +39,7 @@ function HeartRateChart() {
   }, []);
 
   return (
-    <div className="w-[520px] h-[220px] bg-white rounded-2xl shadow-lg p-4">
+    <div className="w-[380px] h-[220px] bg-white rounded-2xl shadow-lg p-4">
       <h3 className="text-center text-sm font-semibold text-gray-700 mb-2">
         ❤️ Biểu đồ nhịp tim
       </h3>
