@@ -14,7 +14,7 @@ interface SurveyProps {
   setHeartRates: React.Dispatch<React.SetStateAction<number[]>>;
 }
 
-export default function Survey({ onComplete, onBack }: SurveyProps) {
+export default function Survey({ onComplete, onBack, heartRates, setHeartRates }: SurveyProps) {
   const workerRef = useRef<Worker | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [situationMode, setSituationMode] = useState(false);
