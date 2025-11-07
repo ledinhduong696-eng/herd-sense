@@ -19,7 +19,7 @@ function HeartRateChart() {
 
   // ✅ Random BPM 60–100
   const generateRandomHeartRate = () => {
-    return 60 + Math.floor(Math.random() * 41); // 60 → 100
+    return 65 + Math.floor(Math.random() * 31); 
   };
 
   const addHeartBeat = () => {
