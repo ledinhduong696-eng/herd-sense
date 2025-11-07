@@ -8,6 +8,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import Reviews from './pages/Reviews';
 import SituationAI from "./components/SituationAI";
+import { supabaseHeart } from "./lib/supabase";
 
 type Page = 'home' | 'survey' | 'situation' | 'result' | 'about' | 'contact' | 'reviews';
 
@@ -18,7 +19,19 @@ function App() {
   const resetHeartRate = () => {
     setHeartRates([]);
   };
-  
+  const resetHeartDataInSupabase = async () => {
+    const { error } = await supabaseHeart
+      .from("heart_data")
+      .delete()
+      .neq("id", 0);   // xoá tất cả hàng
+
+    if (error) {
+      console.error("Lỗi reset dữ liệu nhịp tim:", error);
+    } else {
+      console.log("✅ Đã reset bảng heart_data");
+    }
+  };
+
   const handleStartSurvey = () => {
     setCurrentPage('survey');
   };
@@ -52,9 +65,10 @@ function App() {
 
       {currentPage === 'home' && (
         <Home 
-          onStartSurvey={() => {
-            resetHeartRate();     // ✅ reset trước
-            handleStartSurvey();  // ✅ sau đó chuyển sang survey
+          onStartSurvey={async () => {
+            await resetHeartDataInSupabase();   // ✅ Xoá dữ liệu nhịp tim
+            resetHeartRate();                   // xoá local state (không bắt buộc nhưng cho sạch)
+            handleStartSurvey();                // chuyển trang khảo sát
           }} 
         />
       )}
